@@ -2,23 +2,29 @@ name: Run unit tests
 
 on:
   workflow_dispatch:
-
+  
 jobs:
-  test:
+  runner-job:
     runs-on: ubuntu-latest
 
     services:
+      # Label used to access the service container
       postgres:
+        # Docker Hub image
         image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
         ports:
           - 5432:5432
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: mydb
 
     steps:
-      - name: Checkout code
+      # Downloads a copy of the code in your repository before running CI tests
+      - name: Check out repository code
         uses: actions/checkout@v2
 
       - name: Set up Python
@@ -29,14 +35,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Wait for PostgreSQL to start
-        run: |
-          dockerize -wait tcp://localhost:5432 -timeout 1m
-
-      - name: Run database migrations
-        run: python manage.py migrate
+      - name: Connect to PostgreSQL
+        # Runs a script that creates a PostgreSQL table, populates
+        # the table with data, and then retrieves the data
+        run: node client.js
+        # Environment variables used by the `client.js` script to create
+        # a new PostgreSQL table.
+        env:
+          # The hostname used to communicate with the PostgreSQL service container
+          POSTGRES_HOST: localhost
+          # The default PostgreSQL port
+          POSTGRES_PORT: 5432
 
       - name: Run unit tests
         run: python test_user.py
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mydb
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/
